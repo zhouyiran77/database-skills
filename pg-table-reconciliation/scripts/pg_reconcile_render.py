@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from pg_reconcile_model import TableReport
+from pg_reconcile_model import ColumnDef, TableReport
 from pg_reconcile_risk import summarize_risks
 
 
@@ -71,8 +71,56 @@ def _table_markdown(report: TableReport) -> list[str]:
         lines.append("- Column metadata differences:")
         for diff in report.column_diffs:
             lines.append(f"  - `{diff.column}` {diff.field}: {diff.source} -> {diff.target}")
+    lines.extend(_structure_markdown("Source table structure", report.source_table_structure))
+    if report.target_exists:
+        lines.extend(_structure_markdown("Target table structure", report.target_table_structure))
+    else:
+        lines.extend(["", "### Target table structure", "", "_Target table is missing; no target structure is available._"])
     if report.risks:
+        lines.append("")
         lines.append("- Risks:")
         for risk in report.risks:
             lines.append(f"  - [{risk.severity.value}] {risk.message} {risk.recommendation}")
     return lines
+
+
+def _structure_markdown(title: str, columns: tuple[ColumnDef, ...]) -> list[str]:
+    lines = [
+        "",
+        f"### {title}",
+        "",
+    ]
+    if not columns:
+        lines.append("_No columns found._")
+        return lines
+    lines.extend(
+        [
+            "| Column | Type | UDT | Nullable | Default | Length | Precision | Scale | Datetime precision |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        ],
+    )
+    for column in columns:
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    f"`{_markdown_cell(column.name)}`",
+                    _markdown_cell(column.data_type),
+                    _markdown_cell(column.udt_name),
+                    _markdown_cell(column.is_nullable),
+                    _markdown_cell(column.column_default),
+                    _markdown_cell(column.character_maximum_length),
+                    _markdown_cell(column.numeric_precision),
+                    _markdown_cell(column.numeric_scale),
+                    _markdown_cell(column.datetime_precision),
+                ),
+            )
+            + " |",
+        )
+    return lines
+
+
+def _markdown_cell(value: str | int | None) -> str:
+    if value is None:
+        return "-"
+    return str(value).replace("|", "\\|").replace("\n", " ")

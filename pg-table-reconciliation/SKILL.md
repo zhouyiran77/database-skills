@@ -60,6 +60,8 @@ Treat these as migration risk signals:
 
 If a source table has no primary key, call that out even when row counts match. Hash checks without a stable key can still be useful, but reviewability and repeatability are weaker.
 
+Markdown table-level sections include both source and target table structure details. When the target table is missing, still show the source structure and explicitly state that no target structure is available.
+
 ## Command Reference
 
 For exact command templates, CLI options, DSN examples, report-reading notes, and troubleshooting, read:

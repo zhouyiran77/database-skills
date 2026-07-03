@@ -121,6 +121,8 @@ class TableReport:
     target_exists: bool
     source_columns: int
     target_columns: int
+    source_table_structure: tuple[ColumnDef, ...]
+    target_table_structure: tuple[ColumnDef, ...]
     only_in_source: tuple[str, ...]
     only_in_target: tuple[str, ...]
     column_diffs: tuple[ColumnDiff, ...]
@@ -138,6 +140,8 @@ class TableReport:
             "target_exists": self.target_exists,
             "source_columns": self.source_columns,
             "target_columns": self.target_columns,
+            "source_table_structure": [asdict(item) for item in self.source_table_structure],
+            "target_table_structure": [asdict(item) for item in self.target_table_structure],
             "only_in_source": list(self.only_in_source),
             "only_in_target": list(self.only_in_target),
             "column_diffs": [asdict(item) for item in self.column_diffs],

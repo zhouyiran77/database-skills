@@ -9,6 +9,7 @@
 - Supports a single table, multiple tables, or a wildcard range such as `schema.*`.
 - Supports fixed table-name prefixes on either side, such as comparing source `public.user` to target `public.edu_user`.
 - Compares table existence, missing columns, data types, length, precision, defaults, nullability, and primary keys.
+- Includes detailed source and target table structures in Markdown table-level sections.
 - Supports three data check levels: `none`, `row-count`, and `hash`.
 - Outputs Markdown or JSON reports.
 - Summarizes migration risks by severity: `critical`, `high`, `medium`, and `low`.
@@ -243,6 +244,7 @@ Markdown reports typically include:
 
 - Summary: number of compared tables, number of tables with differences, and risk distribution.
 - Table mapping: logical table, source physical table, and target physical table.
+- Table structure details: source and target column names, types, UDT names, nullability, defaults, length, precision, scale, and datetime precision.
 - Schema differences: source-only columns, target-only columns, column metadata differences, and primary-key differences.
 - Data checks: row-count differences or hash differences.
 - Migration risks: severity, reason, and recommended follow-up action.

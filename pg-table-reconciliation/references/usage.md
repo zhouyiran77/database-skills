@@ -207,6 +207,7 @@ Markdown reports include:
 
 - Summary counts for checked tables and risks by severity.
 - Per-table mapping from logical name to source and target physical names.
+- Full source and target table structures for each compared table.
 - Schema differences: source-only columns, target-only columns, metadata differences, and primary-key differences.
 - Data checks: row-count differences or hash differences.
 - Migration risks with severity, reason, and recommended follow-up.
