@@ -7,7 +7,8 @@
 - Connects to two different PostgreSQL database instances.
 - Supports different users, passwords, hosts, and database names for source and target.
 - Supports a single table, multiple tables, or a wildcard range such as `schema.*`.
-- Supports fixed table-name prefixes on either side, such as comparing source `public.user` to target `public.edu_user`.
+- Supports same-name table lists such as `users,roles` and explicit source-target pairs such as `users=roles`.
+- Supports fixed table-name prefixes on either side, such as comparing source `public.user` to target `public.edu_user`; prefixes are not added twice.
 - Compares table existence, missing columns, data types, length, precision, defaults, nullability, and primary keys.
 - Includes detailed source and target table structures in Markdown table-level sections.
 - Supports three data check levels: `none`, `row-count`, and `hash`.
@@ -32,8 +33,10 @@ pg-table-reconciliation/
 |   +-- pg_reconcile_risk.py
 +-- evals/
 |   +-- evals.json
-+-- tests/
+    +-- tests/
+    +-- test_pg_reconcile_cli.py
     +-- test_pg_reconcile_core.py
+    +-- test_pg_reconcile_render.py
 ```
 
 ## Requirements
@@ -135,7 +138,51 @@ uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
   --output-file pg_reconciliation_report.md
 ```
 
-### 2. Target tables use the `edu_` prefix
+Bare table names default to schema `public`, so this compares `public.users` and `public.roles` on both sides:
+
+```powershell
+$skillDir = Split-Path -Parent "path\to\pg-table-reconciliation\SKILL.md"
+uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
+  --source-dsn-env PG_RECON_SOURCE_DSN `
+  --target-dsn-env PG_RECON_TARGET_DSN `
+  --tables "users,roles" `
+  --data-check row-count `
+  --output markdown `
+  --output-file pg_reconciliation_report.md
+```
+
+### 2. Source and target use different table names per pair
+
+Compare source `public.users` to target `public.roles`, and source `public.orders` to target `public.archive_orders`:
+
+```powershell
+$skillDir = Split-Path -Parent "path\to\pg-table-reconciliation\SKILL.md"
+uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
+  --source-dsn-env PG_RECON_SOURCE_DSN `
+  --target-dsn-env PG_RECON_TARGET_DSN `
+  --table-pairs "users=roles,orders=archive_orders" `
+  --data-check row-count `
+  --output markdown `
+  --output-file pg_reconciliation_report.md
+```
+
+When a target prefix is configured, it is added only when missing:
+
+```powershell
+$skillDir = Split-Path -Parent "path\to\pg-table-reconciliation\SKILL.md"
+uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
+  --source-dsn-env PG_RECON_SOURCE_DSN `
+  --target-dsn-env PG_RECON_TARGET_DSN `
+  --table-pairs "users=edu_users" `
+  --target-table-prefix edu_ `
+  --data-check row-count `
+  --output markdown `
+  --output-file pg_reconciliation_report.md
+```
+
+This maps to source `public.users` and target `public.edu_users`, not `public.edu_edu_users`.
+
+### 3. Target tables use the `edu_` prefix
 
 Pass logical table names in `--tables`. The script maps them to prefixed physical target tables:
 
@@ -158,7 +205,7 @@ Mapping:
 | `public.user` | `public.user` | `public.edu_user` |
 | `public.school` | `public.school` | `public.edu_school` |
 
-### 3. Source tables use the `edu_` prefix
+### 4. Source tables use the `edu_` prefix
 
 Pass logical table names in `--tables`. The script maps them to prefixed physical source tables:
 
@@ -174,7 +221,7 @@ uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
   --output-file pg_reconciliation_report.md
 ```
 
-### 4. Compare an entire schema
+### 5. Compare an entire schema
 
 ```powershell
 $skillDir = Split-Path -Parent "path\to\pg-table-reconciliation\SKILL.md"
@@ -193,7 +240,7 @@ If `--target-table-prefix edu_` is set with `--tables "public.*"`, source `publi
 
 If `--source-table-prefix edu_` is set with `--tables "public.*"`, the script expands only source tables whose names start with `edu_`, strips that prefix from the logical name, and compares the resulting logical table to the target.
 
-### 5. Output JSON
+### 6. Output JSON
 
 Use JSON for automation or downstream processing:
 
@@ -208,7 +255,7 @@ uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
   --output-file pg_reconciliation_report.json
 ```
 
-### 6. Hash check for small tables
+### 7. Hash check for small tables
 
 `hash` reads table data and generates deterministic signatures. Use it for small tables, lookup tables, or a curated list of important tables. Avoid using it blindly on large tables.
 
@@ -230,11 +277,13 @@ uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
 | --- | --- | --- |
 | `--source-dsn-env` | `PG_RECON_SOURCE_DSN` | Environment variable containing the source database DSN. |
 | `--target-dsn-env` | `PG_RECON_TARGET_DSN` | Environment variable containing the target database DSN. |
-| `--tables` | `public.*` | Comparison scope. Supports `schema.table`, comma-separated table lists, and `schema.*`. |
+| `--tables` | `public.*` | Same-name comparison scope. Supports bare table names, `schema.table`, comma-separated table lists, and `schema.*`. |
+| `--table-pairs` | empty | Explicit source-target table mappings such as `users=roles,orders=archive_orders`. |
+| `--default-schema` | `public` | Schema used for bare table names in `--tables` and `--table-pairs`. |
 | `--data-check` | `row-count` | Data check level: `none`, `row-count`, or `hash`. |
 | `--hash-row-limit` | `200000` | Maximum number of rows to read for hash checks. |
-| `--source-table-prefix` | empty | Physical table-name prefix on the source side, such as `edu_`. |
-| `--target-table-prefix` | empty | Physical table-name prefix on the target side, such as `edu_`. |
+| `--source-table-prefix` | empty | Physical table-name prefix on the source side, such as `src_`. Added only when missing. |
+| `--target-table-prefix` | empty | Physical table-name prefix on the target side, such as `edu_`. Added only when missing. |
 | `--output` | `markdown` | Output format: `markdown` or `json`. |
 | `--output-file` | empty | Report file path. If omitted, the report is printed to stdout. |
 
@@ -299,7 +348,7 @@ Do not use connection strings such as `postgresql://.../db?schema=public`. Selec
 If the report says the target table is missing, check:
 
 - Whether `--target-table-prefix edu_` should be set.
-- Whether `--tables` contains logical table names instead of already-prefixed physical table names.
+- Whether `--tables` or `--table-pairs` contains the intended logical/physical names. Prefixes are added only when missing.
 - Whether the schema is correct. For example, `public.user` and `edu.user` are different table scopes.
 
 ### `public.*` plus a prefix maps unwanted system or migration tables

@@ -18,6 +18,18 @@
       "prompt": "For automation, compare every table in public from source to target and save JSON output. Start with row-count only; I do not want hash checks yet.",
       "expected_output": "Uses --tables \"public.*\", --data-check row-count, --output json, and an output JSON file. It should not enable hash checks.",
       "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Compare users and roles tables between the source and target PostgreSQL instances. These are the same table names on both sides; the DSNs are already in PG_RECON_SOURCE_DSN and PG_RECON_TARGET_DSN.",
+      "expected_output": "Uses --tables \"users,roles\" for same-name comparisons, defaults bare names to the public schema, and does not use --table-pairs.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Compare source users to target roles, and source orders to target archive_orders. The DSN env vars are PG_RECON_SOURCE_DSN and PG_RECON_TARGET_DSN.",
+      "expected_output": "Uses --table-pairs \"users=roles,orders=archive_orders\" with source tables on the left and target tables on the right.",
+      "files": []
     }
   ]
 }

@@ -36,8 +36,10 @@ class TableName:
     name: str
 
     @classmethod
-    def parse(cls, raw: str) -> Self:
+    def parse(cls, raw: str, default_schema: str = "public") -> Self:
         parts = raw.strip().split(".")
+        if len(parts) == 1 and parts[0]:
+            return cls(schema=default_schema, name=parts[0])
         if len(parts) != 2 or not parts[0] or not parts[1]:
             raise TableSpecError(raw=raw)
         return cls(schema=parts[0], name=parts[1])
@@ -46,7 +48,7 @@ class TableName:
         return f"{self.schema}.{self.name}"
 
     def with_prefix(self, prefix: str) -> Self:
-        if not prefix:
+        if not prefix or self.name.startswith(prefix):
             return self
         return type(self)(schema=self.schema, name=f"{prefix}{self.name}")
 
@@ -63,6 +65,14 @@ class TableMapping:
             logical=logical,
             source=logical.with_prefix(source_prefix),
             target=logical.with_prefix(target_prefix),
+        )
+
+    @classmethod
+    def from_pair(cls, source: TableName, target: TableName, source_prefix: str = "", target_prefix: str = "") -> Self:
+        return cls(
+            logical=source,
+            source=source.with_prefix(source_prefix),
+            target=target.with_prefix(target_prefix),
         )
 
     def report_label(self) -> str:
@@ -83,6 +93,31 @@ def table_without_prefix(table: TableName, prefix: str) -> TableName:
     if prefix and table.name.startswith(prefix):
         return TableName(schema=table.schema, name=table.name[len(prefix):])
     return table
+
+
+def parse_table_names(raw: str, default_schema: str = "public") -> tuple[TableName, ...]:
+    return tuple(TableName.parse(item, default_schema=default_schema) for item in _split_spec_items(raw))
+
+
+def parse_table_pairs(raw: str, default_schema: str = "public", source_prefix: str = "", target_prefix: str = "") -> tuple[TableMapping, ...]:
+    pairs: list[TableMapping] = []
+    for item in _split_spec_items(raw):
+        source_raw, separator, target_raw = item.partition("=")
+        if not separator or not source_raw or not target_raw:
+            raise TableSpecError(raw=item)
+        pairs.append(
+            TableMapping.from_pair(
+                source=TableName.parse(source_raw, default_schema=default_schema),
+                target=TableName.parse(target_raw, default_schema=default_schema),
+                source_prefix=source_prefix,
+                target_prefix=target_prefix,
+            ),
+        )
+    return tuple(pairs)
+
+
+def _split_spec_items(raw: str) -> tuple[str, ...]:
+    return tuple(item.strip() for item in raw.replace(",", " ").split() if item.strip())
 
 
 @dataclass(frozen=True, slots=True)

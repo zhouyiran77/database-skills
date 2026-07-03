@@ -24,6 +24,8 @@ class CliArgs:
     source_dsn_env: str
     target_dsn_env: str
     tables: str
+    table_pairs: str | None
+    default_schema: str
     data_check: str
     hash_row_limit: int
     source_table_prefix: str
@@ -42,6 +44,8 @@ def main() -> int:
         table_spec=args.tables,
         data_check=parse_data_check(args.data_check),
         hash_row_limit=args.hash_row_limit,
+        table_pairs=args.table_pairs,
+        default_schema=args.default_schema,
         source_table_prefix=args.source_table_prefix,
         target_table_prefix=args.target_table_prefix,
     )
@@ -59,6 +63,8 @@ def parse_args() -> CliArgs:
     parser.add_argument("--source-dsn-env", default="PG_RECON_SOURCE_DSN")
     parser.add_argument("--target-dsn-env", default="PG_RECON_TARGET_DSN")
     parser.add_argument("--tables", default="public.*")
+    parser.add_argument("--table-pairs")
+    parser.add_argument("--default-schema", default="public")
     parser.add_argument("--data-check", default="row-count", choices=["none", "row-count", "hash"])
     parser.add_argument("--hash-row-limit", type=int, default=200_000)
     parser.add_argument("--source-table-prefix", default="")
@@ -70,6 +76,8 @@ def parse_args() -> CliArgs:
         source_dsn_env=namespace.source_dsn_env,
         target_dsn_env=namespace.target_dsn_env,
         tables=namespace.tables,
+        table_pairs=namespace.table_pairs,
+        default_schema=namespace.default_schema,
         data_check=namespace.data_check,
         hash_row_limit=namespace.hash_row_limit,
         source_table_prefix=namespace.source_table_prefix,

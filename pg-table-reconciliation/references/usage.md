@@ -94,6 +94,48 @@ uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
   --output-file pg_reconciliation_report.md
 ```
 
+Same-name bare table comparison. This compares source `public.users` to target `public.users`, and source `public.roles` to target `public.roles`:
+
+```powershell
+$skillDir = Split-Path -Parent "path\to\pg-table-reconciliation\SKILL.md"
+uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
+  --source-dsn-env PG_RECON_SOURCE_DSN `
+  --target-dsn-env PG_RECON_TARGET_DSN `
+  --tables "users,roles" `
+  --data-check row-count `
+  --output markdown `
+  --output-file pg_reconciliation_report.md
+```
+
+Explicit source-target table pairs. This compares source `public.users` to target `public.roles`, and source `public.orders` to target `public.archive_orders`:
+
+```powershell
+$skillDir = Split-Path -Parent "path\to\pg-table-reconciliation\SKILL.md"
+uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
+  --source-dsn-env PG_RECON_SOURCE_DSN `
+  --target-dsn-env PG_RECON_TARGET_DSN `
+  --table-pairs "users=roles,orders=archive_orders" `
+  --data-check row-count `
+  --output markdown `
+  --output-file pg_reconciliation_report.md
+```
+
+Explicit pairs with a target prefix. This compares source `public.users` to target `public.edu_users`, and source `public.roles` to target `public.edu_roles`:
+
+```powershell
+$skillDir = Split-Path -Parent "path\to\pg-table-reconciliation\SKILL.md"
+uv run (Join-Path $skillDir "scripts\pg_reconcile.py") `
+  --source-dsn-env PG_RECON_SOURCE_DSN `
+  --target-dsn-env PG_RECON_TARGET_DSN `
+  --table-pairs "users=users,roles=roles" `
+  --target-table-prefix edu_ `
+  --data-check row-count `
+  --output markdown `
+  --output-file pg_reconciliation_report.md
+```
+
+If a pair already includes the prefix, the script does not add it again. For example, `--table-pairs "users=edu_users" --target-table-prefix edu_` maps to source `public.users` and target `public.edu_users`, not `public.edu_edu_users`.
+
 Entire schema:
 
 ```powershell
@@ -181,11 +223,13 @@ uv run "$SKILL_DIR/scripts/pg_reconcile.py" \
 | --- | --- | --- |
 | `--source-dsn-env` | `PG_RECON_SOURCE_DSN` | Environment variable containing the source database DSN. |
 | `--target-dsn-env` | `PG_RECON_TARGET_DSN` | Environment variable containing the target database DSN. |
-| `--tables` | `public.*` | Comparison scope. Supports `schema.table`, comma-separated table lists, and `schema.*`. |
+| `--tables` | `public.*` | Same-name comparison scope. Supports bare table names, `schema.table`, comma-separated table lists, and `schema.*`. Bare names use `--default-schema`. |
+| `--table-pairs` | empty | Explicit source-target mappings, such as `users=roles,orders=archive_orders`. Left side is source, right side is target. |
+| `--default-schema` | `public` | Schema used for bare table names in `--tables` or `--table-pairs`. |
 | `--data-check` | `row-count` | Data check level: `none`, `row-count`, or `hash`. |
 | `--hash-row-limit` | `200000` | Maximum number of rows to read for hash checks. |
-| `--source-table-prefix` | empty | Physical table-name prefix on the source side, such as `edu_`. |
-| `--target-table-prefix` | empty | Physical table-name prefix on the target side, such as `edu_`. |
+| `--source-table-prefix` | empty | Physical table-name prefix on the source side, such as `src_`. Added only when the source table name does not already start with it. |
+| `--target-table-prefix` | empty | Physical table-name prefix on the target side, such as `edu_`. Added only when the target table name does not already start with it. |
 | `--output` | `markdown` | Output format: `markdown` or `json`. |
 | `--output-file` | empty | Report file path. If omitted, the report is printed to stdout. |
 
@@ -200,6 +244,20 @@ Pass logical table names in `--tables`. The script applies prefixes to physical 
 | `public.user` | `old_` | `new_` | `public.old_user` | `public.new_user` |
 
 For `schema.*`, expansion is source-driven. If `--source-table-prefix edu_` is set, the script expands only source tables whose names start with `edu_`, then strips that prefix from the logical report name.
+
+## Explicit Table Pair Mapping
+
+Use `--table-pairs` when a source table should compare to a different target table. The left side is always source; the right side is always target. Prefix options still apply, but only when the side's table name does not already include the prefix.
+
+| Options | Source physical table | Target physical table |
+| --- | --- | --- |
+| `--table-pairs "users=roles"` | `public.users` | `public.roles` |
+| `--table-pairs "users=roles" --target-table-prefix edu_` | `public.users` | `public.edu_roles` |
+| `--table-pairs "users=edu_users" --target-table-prefix edu_` | `public.users` | `public.edu_users` |
+| `--table-pairs "auth.users=archive.roles"` | `auth.users` | `archive.roles` |
+| `--table-pairs "users=roles,orders=archive_orders"` | `public.users`, `public.orders` | `public.roles`, `public.archive_orders` |
+
+When `--table-pairs` is set, it takes precedence over `--tables`.
 
 ## Reading The Report
 

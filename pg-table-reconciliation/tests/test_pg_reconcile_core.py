@@ -11,8 +11,10 @@ from pg_reconcile_core import (  # noqa: E402
     Severity,
     TableMapping,
     TableName,
+    parse_table_pairs,
     build_table_report,
     missing_target_report,
+    parse_table_names,
     table_without_prefix,
 )
 
@@ -83,6 +85,16 @@ class CoreComparisonTests(unittest.TestCase):
         self.assertEqual(mapping.target.label(), "public.edu_user")
         self.assertEqual(mapping.report_label(), "public.user (source: public.user, target: public.edu_user)")
 
+    def test_target_prefix_is_not_added_twice_when_table_already_has_prefix(self) -> None:
+        mapping = TableMapping.from_prefixes(
+            logical=TableName(schema="public", name="edu_user"),
+            source_prefix="",
+            target_prefix="edu_",
+        )
+
+        self.assertEqual(mapping.source.label(), "public.edu_user")
+        self.assertEqual(mapping.target.label(), "public.edu_user")
+
     def test_source_prefix_maps_logical_name_to_physical_source_table(self) -> None:
         mapping = TableMapping.from_prefixes(
             logical=TableName(schema="public", name="user"),
@@ -97,6 +109,43 @@ class CoreComparisonTests(unittest.TestCase):
         logical = table_without_prefix(TableName(schema="public", name="edu_user"), "edu_")
 
         self.assertEqual(logical.label(), "public.user")
+
+    def test_bare_table_list_defaults_to_public_schema_for_same_name_compare(self) -> None:
+        tables = parse_table_names("users,roles", default_schema="public")
+
+        self.assertEqual([table.label() for table in tables], ["public.users", "public.roles"])
+
+    def test_table_pairs_map_bare_source_tables_to_bare_target_tables(self) -> None:
+        pairs = parse_table_pairs("users=roles,orders=archive_orders", default_schema="public")
+
+        self.assertEqual([pair.source.label() for pair in pairs], ["public.users", "public.orders"])
+        self.assertEqual([pair.target.label() for pair in pairs], ["public.roles", "public.archive_orders"])
+        self.assertEqual(
+            [pair.report_label() for pair in pairs],
+            [
+                "public.users (source: public.users, target: public.roles)",
+                "public.orders (source: public.orders, target: public.archive_orders)",
+            ],
+        )
+
+    def test_table_pairs_allow_schema_qualified_source_and_target_tables(self) -> None:
+        pairs = parse_table_pairs("auth.users=archive.roles", default_schema="public")
+
+        self.assertEqual(pairs[0].source.label(), "auth.users")
+        self.assertEqual(pairs[0].target.label(), "archive.roles")
+
+    def test_table_pairs_apply_prefixes_only_when_missing(self) -> None:
+        pairs = parse_table_pairs(
+            "users=edu_users,orders=archive_orders",
+            default_schema="public",
+            source_prefix="src_",
+            target_prefix="edu_",
+        )
+
+        self.assertEqual(pairs[0].source.label(), "public.src_users")
+        self.assertEqual(pairs[0].target.label(), "public.edu_users")
+        self.assertEqual(pairs[1].source.label(), "public.src_orders")
+        self.assertEqual(pairs[1].target.label(), "public.edu_archive_orders")
 
 
 if __name__ == "__main__":

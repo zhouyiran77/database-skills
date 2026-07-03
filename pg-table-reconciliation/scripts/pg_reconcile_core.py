@@ -11,6 +11,8 @@ from pg_reconcile_model import (
     TableReport,
     TableSpecError,
     parse_data_check,
+    parse_table_names,
+    parse_table_pairs,
     table_without_prefix,
 )
 from pg_reconcile_risk import report_with_risks, summarize_risks
@@ -30,6 +32,8 @@ __all__ = [
     "compare_columns",
     "missing_target_report",
     "parse_data_check",
+    "parse_table_names",
+    "parse_table_pairs",
     "report_with_risks",
     "summarize_risks",
     "table_without_prefix",

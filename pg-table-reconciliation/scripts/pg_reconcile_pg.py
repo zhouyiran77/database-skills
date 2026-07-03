@@ -7,7 +7,7 @@ import psycopg
 from psycopg import sql
 
 from pg_reconcile_compare import build_table_report, missing_target_report
-from pg_reconcile_model import ColumnDef, DataCheck, TableMapping, TableName, TableReport, table_without_prefix
+from pg_reconcile_model import ColumnDef, DataCheck, TableMapping, TableName, TableReport, parse_table_names, parse_table_pairs, table_without_prefix
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,6 +17,8 @@ class RunConfig:
     table_spec: str
     data_check: DataCheck
     hash_row_limit: int
+    table_pairs: str | None = None
+    default_schema: str = "public"
     source_table_prefix: str = ""
     target_table_prefix: str = ""
 
@@ -25,10 +27,9 @@ class RunConfig:
 class PgRepository:
     conn: psycopg.Connection
 
-    def resolve_tables(self, spec: str, source_table_prefix: str) -> tuple[TableName, ...]:
+    def resolve_tables(self, spec: str, source_table_prefix: str, default_schema: str) -> tuple[TableName, ...]:
         tables: list[TableName] = []
-        for raw in spec.split(","):
-            item = TableName.parse(raw)
+        for item in parse_table_names(spec, default_schema=default_schema):
             if item.name == "*":
                 tables.extend(table_without_prefix(table, source_table_prefix) for table in self._tables_in_schema(item.schema, source_table_prefix))
             else:
@@ -136,8 +137,8 @@ def reconcile(config: RunConfig) -> tuple[TableReport, ...]:
     with connect_from_env(config.source_dsn_env) as source_conn, connect_from_env(config.target_dsn_env) as target_conn:
         context = CompareContext(PgRepository(source_conn), PgRepository(target_conn), config)
         reports: list[TableReport] = []
-        for table in context.source.resolve_tables(config.table_spec, config.source_table_prefix):
-            reports.append(_compare_one(context, table))
+        for mapping in _resolve_mappings(context):
+            reports.append(_compare_one(context, mapping))
     return tuple(reports)
 
 
@@ -148,18 +149,29 @@ def connect_from_env(env_name: str) -> psycopg.Connection:
     return psycopg.connect(dsn)
 
 
-def _compare_one(context: CompareContext, table: TableName) -> TableReport:
-    mapping = TableMapping.from_prefixes(table, context.config.source_table_prefix, context.config.target_table_prefix)
+def _resolve_mappings(context: CompareContext) -> tuple[TableMapping, ...]:
+    if context.config.table_pairs:
+        return parse_table_pairs(
+            context.config.table_pairs,
+            default_schema=context.config.default_schema,
+            source_prefix=context.config.source_table_prefix,
+            target_prefix=context.config.target_table_prefix,
+        )
+    tables = context.source.resolve_tables(context.config.table_spec, context.config.source_table_prefix, context.config.default_schema)
+    return tuple(TableMapping.from_prefixes(table, context.config.source_table_prefix, context.config.target_table_prefix) for table in tables)
+
+
+def _compare_one(context: CompareContext, mapping: TableMapping) -> TableReport:
     source_columns = context.source.columns(mapping.source)
     source_rows = context.source.row_count(mapping.source) if context.config.data_check != DataCheck.NONE else None
     if not context.target.table_exists(mapping.target):
-        return missing_target_report(table, source_columns, source_rows, mapping.report_label())
+        return missing_target_report(mapping.logical, source_columns, source_rows, mapping.report_label())
     target_columns = context.target.columns(mapping.target)
     source_pk = context.source.primary_key(mapping.source)
     target_pk = context.target.primary_key(mapping.target)
     target_rows = context.target.row_count(mapping.target) if context.config.data_check != DataCheck.NONE else None
     source_hash, target_hash = _hashes(context, mapping, source_columns, target_columns)
-    return build_table_report(table, source_columns, target_columns, (source_rows, target_rows, source_hash, target_hash), (source_pk, target_pk), mapping.report_label())
+    return build_table_report(mapping.logical, source_columns, target_columns, (source_rows, target_rows, source_hash, target_hash), (source_pk, target_pk), mapping.report_label())
 
 
 def _hashes(
