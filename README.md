@@ -10,6 +10,46 @@ Each skill lives in its own directory and includes a required `SKILL.md`. Larger
 | --- | --- | --- | --- |
 | `pg-table-reconciliation` | Ready | Compare PostgreSQL tables across source and target databases, validate migrations, inspect schema drift, compare row counts or hashes, and assess migration risks. | [`pg-table-reconciliation/SKILL.md`](pg-table-reconciliation/SKILL.md) |
 
+## Install With npx
+
+Install a skill from this repository with the `skills` CLI through `npx`:
+
+```text
+https://github.com/zhouyiran77/database-skills
+```
+
+Install into Claude Code globally:
+
+```bash
+npx skills add zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code --global
+```
+
+Install into the current project instead of globally:
+
+```bash
+npx skills add zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code
+```
+
+Install from the full GitHub URL if your CLI version expects a URL:
+
+```bash
+npx skills add https://github.com/zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code --global
+```
+
+The installed Claude Code skill should end up under one of these locations:
+
+```text
+~/.claude/skills/pg-table-reconciliation/
+<project>/.claude/skills/pg-table-reconciliation/
+```
+
+If the `skills` CLI changes or is unavailable, install manually by copying the skill directory to the Claude Code skills directory:
+
+```bash
+mkdir -p ~/.claude/skills
+cp -R pg-table-reconciliation ~/.claude/skills/
+```
+
 ## Repository Layout
 
 ```text
