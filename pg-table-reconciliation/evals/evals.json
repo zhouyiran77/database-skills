@@ -1,0 +1,23 @@
+{
+  "skill_name": "pg-table-reconciliation",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use the pg-table-reconciliation skill to validate a PostgreSQL migration. The source DSN is in PG_RECON_SOURCE_DSN, the target DSN is in PG_RECON_TARGET_DSN, and I need to compare public.student and public.course with row counts. Produce a Markdown report file.",
+      "expected_output": "Runs the bundled script through environment variable names, uses --tables \"public.student,public.course\", --data-check row-count, and writes a Markdown reconciliation report without exposing DSNs.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I migrated public.user and public.school into target tables named public.edu_user and public.edu_school. Source and target DSNs are already set in PG_RECON_SOURCE_DSN and PG_RECON_TARGET_DSN. Compare the tables and summarize any migration risks.",
+      "expected_output": "Uses logical table names with --target-table-prefix edu_, keeps credentials in environment variables, and explains critical/high/medium/low risks from the report.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "For automation, compare every table in public from source to target and save JSON output. Start with row-count only; I do not want hash checks yet.",
+      "expected_output": "Uses --tables \"public.*\", --data-check row-count, --output json, and an output JSON file. It should not enable hash checks.",
+      "files": []
+    }
+  ]
+}
