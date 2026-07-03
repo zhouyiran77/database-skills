@@ -32,6 +32,29 @@ export PG_RECON_SOURCE_DSN='postgresql://source_user:source_password@source-host
 export PG_RECON_TARGET_DSN='postgresql://target_user:target_password@target-host:5432/target_db'
 ```
 
+Confirm the variables are visible to the process that will run the script without printing their values:
+
+PowerShell:
+
+```powershell
+"PG_RECON_SOURCE_DSN present: $([bool]$env:PG_RECON_SOURCE_DSN)"
+"PG_RECON_TARGET_DSN present: $([bool]$env:PG_RECON_TARGET_DSN)"
+```
+
+Bash:
+
+```bash
+test -n "$PG_RECON_SOURCE_DSN" && echo "PG_RECON_SOURCE_DSN present"
+test -n "$PG_RECON_TARGET_DSN" && echo "PG_RECON_TARGET_DSN present"
+```
+
+On Windows, setting `$env:PG_RECON_SOURCE_DSN = "..."` in a separate PowerShell window does not update an already-running Claude Code process. Set the variables in the same runtime that runs the command, or set user-level environment variables and restart Claude Code:
+
+```powershell
+[Environment]::SetEnvironmentVariable("PG_RECON_SOURCE_DSN", "postgresql://source_user:source_password@source-host:5432/source_db", "User")
+[Environment]::SetEnvironmentVariable("PG_RECON_TARGET_DSN", "postgresql://target_user:target_password@target-host:5432/target_db", "User")
+```
+
 When passwords contain special characters, libpq key-value DSNs are often easier:
 
 ```text
@@ -194,7 +217,7 @@ Prioritize `critical` and `high` findings. `medium` findings usually need human 
 
 Missing environment variable:
 
-Set `PG_RECON_SOURCE_DSN` or `PG_RECON_TARGET_DSN` in the same terminal or runtime environment that runs the command.
+Set `PG_RECON_SOURCE_DSN` or `PG_RECON_TARGET_DSN` in the same terminal or runtime environment that runs the command. If Claude Code is already open on Windows, user-level environment variable changes usually require restarting Claude Code before commands can see them.
 
 URI DSN percent-encoding errors:
 

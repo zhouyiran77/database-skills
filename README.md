@@ -21,19 +21,19 @@ https://github.com/zhouyiran77/database-skills
 Install into Claude Code globally:
 
 ```bash
-npx skills add zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code --global
+npx skills add zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code --global --yes
 ```
 
 Install into the current project instead of globally:
 
 ```bash
-npx skills add zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code
+npx skills add zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code --yes
 ```
 
 Install from the full GitHub URL if your CLI version expects a URL:
 
 ```bash
-npx skills add https://github.com/zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code --global
+npx skills add https://github.com/zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code --global --yes
 ```
 
 The installed Claude Code skill should end up under one of these locations:

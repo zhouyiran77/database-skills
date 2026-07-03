@@ -36,15 +36,16 @@ Ask only for missing operational details. Do not ask the user to paste secrets i
 ## Workflow
 
 1. Confirm the databases are PostgreSQL and the user has read-only credentials available through environment variables.
-2. If the request uses passwords or full DSNs in chat, redirect them to set environment variables locally and continue with the variable names.
-3. Choose the comparison scope:
+2. Confirm the environment variables are visible in the same shell or Claude Code runtime that will run the script. On Windows, temporary PowerShell `$env:...` values set after Claude Code starts may not be visible to Claude Code commands.
+3. If the request uses passwords or full DSNs in chat, redirect them to set environment variables locally and continue with the variable names.
+4. Choose the comparison scope:
    - Use explicit table lists for curated migration checks.
    - Use `schema.*` for broad checks. Expansion is source-driven.
    - With `--source-table-prefix`, wildcard expansion includes only source tables that start with that prefix, then strips the prefix from logical report names.
    - With `--target-table-prefix`, logical source table names map to prefixed target physical tables.
-4. Start with `--data-check row-count` unless the user explicitly asks for schema-only checks or hash checks.
-5. Use `--data-check hash` only after confirming the table set is small enough or the user accepts the configured `--hash-row-limit`.
-6. Produce a short executive summary before detailed table findings. Highlight critical and high risks first.
+5. Start with `--data-check row-count` unless the user explicitly asks for schema-only checks or hash checks.
+6. Use `--data-check hash` only after confirming the table set is small enough or the user accepts the configured `--hash-row-limit`.
+7. Produce a short executive summary before detailed table findings. Highlight critical and high risks first.
 
 ## Risk Interpretation
 

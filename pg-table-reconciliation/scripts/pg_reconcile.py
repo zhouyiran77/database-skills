@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 
 from pg_reconcile_model import parse_data_check
 from pg_reconcile_render import OutputConfig, write_output
@@ -31,9 +32,9 @@ class CliArgs:
     output_file: Path | None
 
 
-def main() -> None:
+def main() -> int:
     args = parse_args()
-    from pg_reconcile_pg import RunConfig, reconcile
+    from pg_reconcile_pg import MissingDsnError, RunConfig, reconcile
 
     run_config = RunConfig(
         source_dsn_env=args.source_dsn_env,
@@ -44,8 +45,13 @@ def main() -> None:
         source_table_prefix=args.source_table_prefix,
         target_table_prefix=args.target_table_prefix,
     )
-    reports = reconcile(run_config)
+    try:
+        reports = reconcile(run_config)
+    except MissingDsnError as exc:
+        print(_missing_dsn_message(exc.env_name), file=sys.stderr)
+        return 2
     write_output(reports, OutputConfig(output=args.output, output_file=args.output_file))
+    return 0
 
 
 def parse_args() -> CliArgs:
@@ -73,5 +79,20 @@ def parse_args() -> CliArgs:
     )
 
 
+def _missing_dsn_message(env_name: str) -> str:
+    return (
+        f"Missing required environment variable: {env_name}\n"
+        "\n"
+        "Set the DSN in the same shell or Claude Code runtime that runs this command.\n"
+        "Do not paste the DSN into chat or pass it as a CLI flag.\n"
+        "\n"
+        "PowerShell example:\n"
+        f'  $env:{env_name} = "postgresql://user:password@host:5432/database"\n'
+        "\n"
+        "Bash example:\n"
+        f"  export {env_name}='postgresql://user:password@host:5432/database'"
+    )
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
