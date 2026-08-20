@@ -1,0 +1,23 @@
+{
+  "skill_name": "pg-primary-key-conflict-check",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use the pg-primary-key-conflict-check skill with migration-check.md. It contains three PostgreSQL 2.0 school databases and one 3.0 target. Validate the file, run the ID conflict check, save a Markdown report, and summarize conflicts by table. Passwords are already available through the password_env variables in the file.",
+      "expected_output": "Validates the Markdown first, runs the bundled script without exposing secrets, treats exit code 1 as a completed scan with conflicts, and summarizes source-source and source-target conflict counts separately for every scope_id.",
+      "files": ["migration-check.md"]
+    },
+    {
+      "id": 2,
+      "prompt": "Before migrating our school databases, check activity_nodes IDs. 华师 and 武汉理工 use public.activity_nodes, 广东二师 uses legacy.activity_node, and the 3.0 table is teaching.activity_node. Build the Markdown mappings so all three sources are compared together, then run the PostgreSQL check.",
+      "expected_output": "Uses repeated activity_nodes scope_id rows to merge the different source physical tables, maps all sources to the same 3.0 target, keeps primary_key as id, and runs the deterministic checker.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Here is a PostgreSQL migration Markdown table with host, user, and password columns. Please run it and tell me whether any primary keys collide across the source schools and target database.",
+      "expected_output": "Refuses to retain or run plaintext password/DSN columns, replaces them with password_env references, asks the user to set secrets locally, and does not claim the migration is conflict-free until a complete scan succeeds.",
+      "files": []
+    }
+  ]
+}
