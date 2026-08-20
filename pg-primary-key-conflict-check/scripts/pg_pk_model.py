@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import NewType, Self
+from typing import NewType, Self, TypeAlias
 
 
 InstanceId = NewType("InstanceId", str)
 ScopeId = NewType("ScopeId", str)
+ColumnName = NewType("ColumnName", str)
 IdValue = NewType("IdValue", str)
+ComparisonKey: TypeAlias = tuple[ColumnName, ...]
+ComparisonValue: TypeAlias = IdValue | tuple[IdValue, ...]
 
 
 class Role(StrEnum):
@@ -66,9 +69,9 @@ class SourceBinding:
 class ComparisonScope:
     scope_id: ScopeId
     sources: tuple[SourceBinding, ...]
-    target_instance: InstanceId
-    target_table: TableName
-    primary_key: str
+    target_instance: InstanceId | None
+    target_table: TableName | None
+    primary_key: ComparisonKey
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,12 +91,12 @@ class ObservationBatch:
     scope_id: ScopeId
     instance_id: InstanceId
     role: Role
-    ids: tuple[IdValue, ...]
+    ids: tuple[ComparisonValue, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class ConflictRecord:
-    id_value: IdValue
+    id_value: ComparisonValue
     source_instances: tuple[InstanceId, ...]
 
 
@@ -107,12 +110,14 @@ class ConflictDetails:
 @dataclass(frozen=True, slots=True)
 class ScopeResult:
     scope_id: ScopeId
-    target_instance: InstanceId
+    target_instance: InstanceId | None
     source_source: ConflictDetails
-    source_target: ConflictDetails
+    source_target: ConflictDetails | None
 
     def has_conflicts(self) -> bool:
-        return self.source_source.total > 0 or self.source_target.total > 0
+        return self.source_source.total > 0 or (
+            self.source_target is not None and self.source_target.total > 0
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,7 +130,7 @@ class AnalysisRequest:
 class ScanRequest:
     instance: DatabaseInstance
     table: TableName
-    primary_key: str
+    primary_key: ComparisonKey
     batch_size: int
 
 

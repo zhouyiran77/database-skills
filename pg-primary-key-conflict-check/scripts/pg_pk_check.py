@@ -10,7 +10,7 @@ from pg_pk_model import (
     AnalysisRequest,
     CheckConfig,
     CheckReport,
-    IdValue,
+    ComparisonValue,
     ObservationBatch,
     PkConflictError,
     Role,
@@ -22,7 +22,7 @@ from pg_pk_store import ConflictStore
 
 
 class IdReader(Protocol):
-    def read_batches(self, request: ScanRequest) -> Iterator[tuple[IdValue, ...]]: ...
+    def read_batches(self, request: ScanRequest) -> Iterator[tuple[ComparisonValue, ...]]: ...
 
 
 def execute_check(config: CheckConfig, reader: IdReader, options: RunOptions) -> CheckReport:
@@ -54,24 +54,27 @@ def execute_check(config: CheckConfig, reader: IdReader, options: RunOptions) ->
                         )
                         rows += len(batch)
                     scan_counts.append(ScanCount(scope.scope_id, binding.instance_id, rows))
-                target_request = ScanRequest(
-                    instance=config.instance(scope.target_instance),
-                    table=scope.target_table,
-                    primary_key=scope.primary_key,
-                    batch_size=options.batch_size,
-                )
-                target_rows = 0
-                for batch in reader.read_batches(target_request):
-                    store.add(
-                        ObservationBatch(
-                            scope_id=scope.scope_id,
-                            instance_id=scope.target_instance,
-                            role=Role.TARGET,
-                            ids=batch,
-                        ),
+                target_instance_id = scope.target_instance
+                target_table = scope.target_table
+                if target_instance_id is not None and target_table is not None:
+                    target_request = ScanRequest(
+                        instance=config.instance(target_instance_id),
+                        table=target_table,
+                        primary_key=scope.primary_key,
+                        batch_size=options.batch_size,
                     )
-                    target_rows += len(batch)
-                scan_counts.append(ScanCount(scope.scope_id, scope.target_instance, target_rows))
+                    target_rows = 0
+                    for batch in reader.read_batches(target_request):
+                        store.add(
+                            ObservationBatch(
+                                scope_id=scope.scope_id,
+                                instance_id=target_instance_id,
+                                role=Role.TARGET,
+                                ids=batch,
+                            ),
+                        )
+                        target_rows += len(batch)
+                    scan_counts.append(ScanCount(scope.scope_id, target_instance_id, target_rows))
                 results.append(
                     store.analyze(
                         AnalysisRequest(scope=scope, detail_limit=options.detail_limit),

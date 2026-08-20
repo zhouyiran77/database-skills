@@ -33,7 +33,7 @@ Use the heading `## 表比对范围` and these columns:
 | `source_table` | Source physical table in `schema.table` format. |
 | `target_instance` | Alias of a database row whose role is `target`. |
 | `target_table` | Target physical table in `schema.table` format. |
-| `primary_key` | Must be `id` in v1. |
+| `primary_key` | Must be `id` in v1. The field name is retained for compatibility, but `id` is treated as the comparison column and does not need to be independently unique. |
 
 ## Different Source Table Names
 
@@ -91,7 +91,8 @@ Optional controls:
 Before scanning data, the script verifies each mapped physical table:
 
 - The table exists as a PostgreSQL base table.
-- The actual primary key contains exactly one column.
-- That primary-key column is `id`.
+- The configured `id` comparison column exists.
+
+The actual PostgreSQL primary key may be composite, such as `(id, group_id)`. Repeated `id` values inside one instance are deduplicated before conflict analysis. They become `2.0来源库之间` conflicts only when the same value appears in at least two source instances configured under the same `scope_id`.
 
 Any failure stops the run with exit code `2`. This prevents missing tables or incorrect mappings from being reported as conflict-free.

@@ -42,7 +42,7 @@ class DatabaseScanError(PkConflictError):
 class PgIdReader:
     environ: Mapping[str, str]
 
-    def read_batches(self, request: ScanRequest) -> Iterator[tuple[IdValue, ...]]:
+    def read_batches(self, request: ScanRequest) -> Iterator[tuple[tuple[IdValue, ...], ...]]:
         password = self.environ.get(request.instance.password_env)
         if not password:
             raise MissingSecretError(
@@ -64,14 +64,32 @@ class PgIdReader:
         try:
             with psycopg.connect(conninfo) as connection:
                 _validate_table_contract(connection, request)
-                query = sql.SQL("SELECT {}::text FROM {}").format(
-                    sql.Identifier(request.primary_key),
+                query = sql.SQL("SELECT {} FROM {}").format(
+                    sql.SQL(", ").join(
+                        sql.SQL("{}::text").format(sql.Identifier(column))
+                        for column in request.primary_key
+                    ),
                     sql.Identifier(request.table.schema, request.table.name),
                 )
                 with connection.cursor(name="pk_conflict_scan") as cursor:
                     cursor.execute(query)
                     while rows := cursor.fetchmany(request.batch_size):
-                        yield tuple(IdValue(str(row[0])) for row in rows)
+                        keys: list[tuple[IdValue, ...]] = []
+                        for row in rows:
+                            key: list[IdValue] = []
+                            for index, component in enumerate(row):
+                                if component is None:
+                                    raise TableContractError(
+                                        instance_id=request.instance.instance_id,
+                                        table=request.table.label(),
+                                        reason=(
+                                            "query returned null for comparison column "
+                                            f"{request.primary_key[index]}"
+                                        ),
+                                    )
+                                key.append(IdValue(str(component)))
+                            keys.append(tuple(key))
+                        yield tuple(keys)
         except psycopg.Error as exc:
             raise DatabaseScanError(
                 instance_id=request.instance.instance_id,
@@ -99,21 +117,32 @@ def _validate_table_contract(connection: psycopg.Connection, request: ScanReques
                 reason="table does not exist",
             )
         cursor.execute(
-            "SELECT key_usage.column_name "
-            "FROM information_schema.table_constraints AS constraints "
-            "JOIN information_schema.key_column_usage AS key_usage "
-            "ON constraints.constraint_name = key_usage.constraint_name "
-            "AND constraints.constraint_schema = key_usage.constraint_schema "
-            "WHERE constraints.constraint_type = 'PRIMARY KEY' "
-            "AND constraints.table_schema = %s AND constraints.table_name = %s "
-            "ORDER BY key_usage.ordinal_position",
-            (request.table.schema, request.table.name),
+            "SELECT column_name, is_nullable FROM information_schema.columns "
+            "WHERE table_schema = %s AND table_name = %s AND column_name = ANY(%s)",
+            (request.table.schema, request.table.name, list(request.primary_key)),
         )
-        primary_key = tuple(str(row[0]) for row in cursor.fetchall())
-    if primary_key != (request.primary_key,):
-        actual = ", ".join(primary_key) if primary_key else "none"
-        raise TableContractError(
-            instance_id=request.instance.instance_id,
-            table=request.table.label(),
-            reason=f"expected primary key ({request.primary_key}), found ({actual})",
-        )
+        nullability = {str(row[0]): str(row[1]) for row in cursor.fetchall()}
+        missing = tuple(column for column in request.primary_key if column not in nullability)
+        if missing:
+            reason = (
+                f"comparison column {missing[0]} does not exist"
+                if len(missing) == 1
+                else f"comparison columns do not exist: {', '.join(missing)}"
+            )
+            raise TableContractError(
+                instance_id=request.instance.instance_id,
+                table=request.table.label(),
+                reason=reason,
+            )
+        nullable = tuple(column for column in request.primary_key if nullability[column] != "NO")
+        if nullable:
+            reason = (
+                f"comparison column {nullable[0]} is nullable"
+                if len(nullable) == 1
+                else f"comparison columns are nullable: {', '.join(nullable)}"
+            )
+            raise TableContractError(
+                instance_id=request.instance.instance_id,
+                table=request.table.label(),
+                reason=reason,
+            )

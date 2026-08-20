@@ -1,12 +1,13 @@
 ---
 name: pg-primary-key-conflict-check
 description: "Use this skill whenever a PostgreSQL migration consolidates multiple school, tenant, regional, sharded, or legacy database instances into one target instance and primary-key IDs may collide. It parses a Markdown instance/table-mapping configuration, connects automatically with passwords supplied through environment variables, detects duplicate `id` values across 2.0 source instances, and detects source IDs that already exist in the 3.0 target. Prefer this skill for pre-migration PK collision checks, multi-instance merge validation, id_generator collision analysis, school-database consolidation, and source-to-target primary-key conflict reports, even when physical table names differ."
-compatibility: "Python 3.12+, uv, network access to PostgreSQL, and read-only database credentials"
 ---
 
 # PostgreSQL Primary-Key Conflict Check
 
 Use this skill before merging independently generated PostgreSQL IDs from multiple source instances into a shared target instance.
+
+Requires Python 3.12+, `uv`, network access to PostgreSQL, and read-only database credentials.
 
 ## Core Rule
 
@@ -64,8 +65,11 @@ Passwords must stay outside the Markdown file. Each database row contains a `pas
 
 - The v1 implementation supports PostgreSQL only.
 - The physical source and target table names may differ and must use `schema.table` format.
-- The v1 primary key must be the single column `id`.
-- The script verifies that each physical table exists and that its actual PostgreSQL primary key is exactly `(id)` before reading rows.
+- The configured comparison column must be `id`; the Markdown column remains named `primary_key` for compatibility.
+- The actual PostgreSQL primary key may be single-column or composite, and `id` does not need an independent unique constraint.
+- The script verifies that each physical table exists and contains the configured `id` column before reading rows.
+- Repeated `id` values inside one instance are deduplicated. A `2.0来源库之间` conflict exists only when the same `id` appears in at least two source instances.
+- A source-source check therefore requires at least two source instances in the same `scope_id`; one source always yields zero source-source conflicts.
 - Repeated rows with the same `scope_id` are merged. This supports one school using a different 2.0 physical table name.
 - `source_instances: *` expands to every database row whose role is `source`.
 
@@ -75,7 +79,7 @@ The script streams IDs with a PostgreSQL server-side cursor and stores observati
 
 The report always contains exact conflict counts. Detail rows default to 1,000 per conflict type and logical table. Use `--detail-limit 0` only when the user explicitly needs every conflicting ID and accepts a potentially large report.
 
-Tune `--batch-size` only when needed. The default of 10,000 balances round trips and memory use for typical bigint primary keys.
+Tune `--batch-size` only when needed. The default of 10,000 balances round trips and memory use for typical bigint ID columns.
 
 ## Safety
 

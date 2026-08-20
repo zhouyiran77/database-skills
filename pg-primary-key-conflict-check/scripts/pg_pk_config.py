@@ -6,6 +6,8 @@ from typing import Final
 
 from pg_pk_model import (
     CheckConfig,
+    ColumnName,
+    ComparisonKey,
     ComparisonScope,
     ConfigError,
     DatabaseInstance,
@@ -66,9 +68,9 @@ class ScopeRow:
     scope_id: ScopeId
     source_instances: str
     source_table: TableName
-    target_instance: InstanceId
-    target_table: TableName
-    primary_key: str
+    target_instance: InstanceId | None
+    target_table: TableName | None
+    primary_key: ComparisonKey
 
 
 def parse_markdown_config(markdown: str) -> CheckConfig:
@@ -128,8 +130,6 @@ def _parse_instances(table: MarkdownTable) -> tuple[DatabaseInstance, ...]:
         raise ConfigError(message="instance_id values must be unique")
     if not any(instance.role is Role.SOURCE for instance in instances):
         raise ConfigError(message="数据库实例 must contain at least one source")
-    if not any(instance.role is Role.TARGET for instance in instances):
-        raise ConfigError(message="数据库实例 must contain at least one target")
     return instances
 
 
@@ -177,16 +177,19 @@ def _parse_scopes(table: MarkdownTable, instances: tuple[DatabaseInstance, ...])
 
 def _parse_scope_row(row: MarkdownRow) -> ScopeRow:
     scope_id = ScopeId(_parse_safe_id(row.value("scope_id"), "scope_id"))
-    primary_key = row.value("primary_key")
-    if primary_key != "id":
-        raise ConfigError(message=f"scope {scope_id} primary_key must be id in v1")
+    target_instance_raw = row.value("target_instance")
+    target_table_raw = row.value("target_table")
+    if bool(target_instance_raw) != bool(target_table_raw):
+        raise ConfigError(
+            message=f"scope {scope_id} target_instance and target_table must both be set or both be empty"
+        )
     return ScopeRow(
         scope_id=scope_id,
         source_instances=row.value("source_instances"),
         source_table=TableName.parse(row.value("source_table")),
-        target_instance=InstanceId(row.value("target_instance")),
-        target_table=TableName.parse(row.value("target_table")),
-        primary_key=primary_key,
+        target_instance=InstanceId(target_instance_raw) if target_instance_raw else None,
+        target_table=TableName.parse(target_table_raw) if target_table_raw else None,
+        primary_key=_parse_primary_key(row.value("primary_key"), scope_id),
     )
 
 
@@ -204,9 +207,10 @@ def _merge_scope(
         for row in grouped[1:]
     ):
         raise ConfigError(message=f"scope {scope_id} rows must use the same target table and primary key")
-    target = _find_instance(first.target_instance, instances)
-    if target.role is not Role.TARGET:
-        raise ConfigError(message=f"scope {scope_id} target_instance must reference a target role")
+    if first.target_instance is not None:
+        target = _find_instance(first.target_instance, instances)
+        if target.role is not Role.TARGET:
+            raise ConfigError(message=f"scope {scope_id} target_instance must reference a target role")
     source_bindings: list[SourceBinding] = []
     seen: set[InstanceId] = set()
     for row in grouped:
@@ -219,6 +223,8 @@ def _merge_scope(
                 raise ConfigError(message=f"scope {scope_id} maps source instance {alias} more than once")
             seen.add(alias)
             source_bindings.append(SourceBinding(instance_id=alias, table=row.source_table))
+    if first.target_instance is None and len(source_bindings) < 2:
+        raise ConfigError(message=f"scope {scope_id} source-only scope requires at least two source bindings")
     return ComparisonScope(
         scope_id=scope_id,
         sources=tuple(source_bindings),
@@ -248,6 +254,28 @@ def _parse_safe_id(raw: str, field: str) -> str:
     if SAFE_ID.fullmatch(raw) is None:
         raise ConfigError(message=f"{field} must start with a letter and contain only letters, digits, or underscores")
     return raw
+
+
+def _parse_primary_key(raw: str, scope_id: ScopeId) -> ComparisonKey:
+    if raw.startswith("(") != raw.endswith(")"):
+        raise ConfigError(message=f"scope {scope_id} primary_key has malformed parentheses")
+    body = raw[1:-1].strip() if raw.startswith("(") else raw
+    if "(" in body or ")" in body:
+        raise ConfigError(message=f"scope {scope_id} primary_key has malformed parentheses")
+    if not body:
+        raise ConfigError(message=f"scope {scope_id} primary_key must contain at least one identifier")
+    identifiers = tuple(part.strip() for part in body.split(","))
+    if any(not identifier for identifier in identifiers):
+        raise ConfigError(message=f"scope {scope_id} primary_key contains an empty identifier")
+    for identifier in identifiers:
+        if SAFE_ID.fullmatch(identifier) is None:
+            raise ConfigError(
+                message=f"scope {scope_id} primary_key identifier {identifier!r} must start with a letter "
+                "and contain only letters, digits, or underscores"
+            )
+    if len(identifiers) != len(set(identifiers)):
+        raise ConfigError(message=f"scope {scope_id} primary_key contains a duplicate identifier")
+    return tuple(ColumnName(identifier) for identifier in identifiers)
 
 
 def _parse_enabled(raw: str) -> bool:

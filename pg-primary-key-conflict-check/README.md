@@ -9,6 +9,8 @@ It detects two independent conflict dimensions for every logical table:
 
 Source and target physical table names may differ. Multiple source mappings can be grouped under the same logical `scope_id`.
 
+The comparison column is `id`, but it does not need to be the table's sole primary key or have an independent unique constraint. Composite primary keys such as `(id, group_id)` are supported. Duplicate `id` values inside one instance are deduplicated; a source-source conflict is reported only when the same `id` occurs in at least two source instances.
+
 ## Files
 
 ```text
