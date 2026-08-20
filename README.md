@@ -9,6 +9,7 @@ Each skill lives in its own directory and includes a required `SKILL.md`. Larger
 | Skill | Status | Use When | Entry Point |
 | --- | --- | --- | --- |
 | `pg-table-reconciliation` | Ready | Compare PostgreSQL tables across source and target databases, validate migrations, inspect schema drift, compare row counts or hashes, and assess migration risks. | [`pg-table-reconciliation/SKILL.md`](pg-table-reconciliation/SKILL.md) |
+| `pg-primary-key-conflict-check` | Ready | Detect duplicate primary-key IDs across multiple PostgreSQL source instances and collisions with an existing consolidation target before migration. | [`pg-primary-key-conflict-check/SKILL.md`](pg-primary-key-conflict-check/SKILL.md) |
 
 ## Install With npx
 
@@ -22,6 +23,12 @@ Install into Claude Code globally:
 
 ```bash
 npx skills add zhouyiran77/database-skills --skill pg-table-reconciliation --agent claude-code --global --yes
+```
+
+Install the PostgreSQL primary-key conflict checker globally:
+
+```bash
+npx skills add zhouyiran77/database-skills --skill pg-primary-key-conflict-check --agent claude-code --global --yes
 ```
 
 Install into the current project instead of globally:
@@ -105,4 +112,12 @@ For the current PostgreSQL reconciliation skill:
 python -m unittest discover -s pg-table-reconciliation/tests
 python pg-table-reconciliation/scripts/pg_reconcile.py --help
 python -m json.tool pg-table-reconciliation/evals/evals.json
+```
+
+For the PostgreSQL primary-key conflict skill:
+
+```powershell
+python -m unittest discover -s pg-primary-key-conflict-check/tests
+python pg-primary-key-conflict-check/scripts/pg_pk_conflict.py --help
+python -m json.tool pg-primary-key-conflict-check/evals/evals.json
 ```
