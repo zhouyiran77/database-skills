@@ -1,3 +1,10 @@
 .codegraph/
 __pycache__/
 *.py[cod]
+
+.omo
+.omo/
+
+# 敏感报告与临时文件（禁止提交）
+id_check*.md
+*.tmp.md
